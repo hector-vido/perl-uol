@@ -1,7 +1,12 @@
 #!/usr/bin/perl
 
+use DBI;
 use Data::Dumper;
 use strict;
+
+my $dsn = "DBI:mysql:mysql:database=$ENV{'DB_NAME'};host=$ENV{'DB_HOST'};port=3306";
+my $dbh = DBI->connect($dsn, $ENV{'DB_USER'}, $ENV{'DB_PASSWORD'});
+$dbh->{AutoCommit} = 0;
 
 if (!$ARGV[0]) {
 	print("Usage: perl recovery.pl file.sql\n");
@@ -25,20 +30,29 @@ sub assemble_query {
 	my $value = ${$hash}{'query'};
 	$value =~ s/$idt_old/$idt_new/;
 	print($value . "\n");
+    if(!$dbh->do($value)) {
+        $dbh->rollback();
+		exit;
+    }
 }
 
 sub assemble_query_update {
 	my $hash = $_[0];
     my $idt_old = ${$hash}{'old_idt'};
-    my $idt_new = $ids{$idt_old};
+    my $idt_new = $idt_old; #$ids{$idt_old};
 	if (!$idt_new) {
 		$idt_new = $idt_old;
+		return;
 	}
 	print("idt_antigo => " . $idt_old . "\n");
 	print("idt_novo => " . $idt_new . "\n");
 	my $value = ${$hash}{'query'};
 	$value =~ s/IDT_CLIENT=$idt_old/IDT_CLIENT=$idt_new/;
 	print($value . "\n");
+    if(!$dbh->do($value)) {
+        $dbh->rollback();
+		exit;
+    }
 }
 
 my $sql = open(my $fh, '<:encoding(UTF-8)', $ARGV[0]) or die $!;
@@ -134,6 +148,10 @@ foreach(@{$inserts{'CLIENT'}}) {
 	$value =~ s/values \(/values ($idt_new, /;
 	$value =~ s/$idt_old/$idt_new/;
 	print($value . "\n");
+	if(!$dbh->do($value)) {
+		$dbh->rollback();
+		exit;
+	}
 }
 foreach(@{$inserts{'CLIENT_DETAIL'}}) {
 	assemble_query($_, 'id')
@@ -153,6 +171,10 @@ foreach(@{$inserts{'CONTRACT_CLIENT'}}) {
 	$value =~ s/values \(/values ($id, /;
 	$value =~ s/, $idt_old,/, $idt_new,/;
 	print($value . "\n");
+    if(!$dbh->do($value)) {
+        $dbh->rollback();
+		exit;
+    }
 }
 foreach(@{$inserts{'PLAN_CLIENT'}}) {
 	my $id = ${$_}{'id'};
@@ -168,6 +190,10 @@ foreach(@{$inserts{'PLAN_CLIENT'}}) {
 	$value =~ s/values \(/values ($id, /;
 	$value =~ s/, $idt_old,/, $idt_new,/;
 	print($value . "\n");
+    if(!$dbh->do($value)) {
+        $dbh->rollback();
+		exit;
+    }
 }
 foreach(@{$inserts{'CLIENT_PLAN_CHANGE_AUDIT'}}) {
 	assemble_query($_, 'cliente');
@@ -194,5 +220,7 @@ foreach(%updates) {
 # CLIENT
 # ESCROW
 # CONTRACT_CLIENT
+
+$dbh->commit();
 
 close($fh);
