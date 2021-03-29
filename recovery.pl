@@ -30,10 +30,7 @@ sub assemble_query {
 	my $value = ${$hash}{'query'};
 	$value =~ s/$idt_old/$idt_new/;
 	print($value . "\n");
-	if(!$dbh->do($value)) {
-		$dbh->rollback();
-		exit;
-	}
+	$dbh->do($value);
 }
 
 sub assemble_query_update {
@@ -49,10 +46,7 @@ sub assemble_query_update {
 	my $value = ${$hash}{'query'};
 	$value =~ s/IDT_CLIENT=$idt_old/IDT_CLIENT=$idt_new/;
 	print($value . "\n");
-	if(!$dbh->do($value)) {
-		$dbh->rollback();
-		exit;
-	}
+	$dbh->do($value);
 }
 
 my $sql = open(my $fh, '<:encoding(UTF-8)', $ARGV[0]) or die $!;
@@ -148,10 +142,7 @@ foreach(@{$inserts{'CLIENT'}}) {
 	$value =~ s/values \(/values ($idt_new, /;
 	$value =~ s/$idt_old/$idt_new/;
 	print($value . "\n");
-	if(!$dbh->do($value)) {
-		$dbh->rollback();
-		exit;
-	}
+	$dbh->do($value);
 }
 foreach(@{$inserts{'CLIENT_DETAIL'}}) {
 	assemble_query($_, 'id')
@@ -171,10 +162,7 @@ foreach(@{$inserts{'CONTRACT_CLIENT'}}) {
 	$value =~ s/values \(/values ($id, /;
 	$value =~ s/, $idt_old,/, $idt_new,/;
 	print($value . "\n");
-	if(!$dbh->do($value)) {
-		$dbh->rollback();
-		exit;
-	}
+	$dbh->do($value);
 }
 foreach(@{$inserts{'PLAN_CLIENT'}}) {
 	my $id = ${$_}{'id'};
@@ -190,10 +178,7 @@ foreach(@{$inserts{'PLAN_CLIENT'}}) {
 	$value =~ s/values \(/values ($id, /;
 	$value =~ s/, $idt_old,/, $idt_new,/;
 	print($value . "\n");
-	if(!$dbh->do($value)) {
-		$dbh->rollback();
-		exit;
-	}
+	$dbh->do($value);
 }
 foreach(@{$inserts{'CLIENT_PLAN_CHANGE_AUDIT'}}) {
 	assemble_query($_, 'cliente');
