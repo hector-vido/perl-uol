@@ -57,11 +57,13 @@ while(<$fh>) {
 					my %entry = ('id', $id, 'cod', $cod, 'id_new', $new_id, 'query', $_);
 					push(@{$inserts{$tabela}}, \%entry);
 					$ids{$id} = $new_id;
-					#} elsif ($tabela eq 'CONTRACT_CLIENT') {
-					#	my ($cod) = $_ =~ /(\d{6,})/;
-					#	print($cod . "\n");
-					#	print($_ . "\n");
-					#	print($id); exit;
+				} elsif ($tabela eq 'PLAN_CLIENT') {
+					if(!$inserts{$tabela}) {
+						$inserts{$tabela} = ();
+					}
+					my ($old_idt) = $_ =~ /(\d{6,})/;
+					my %entry = ('id', $id, 'cliente', $old_idt, 'query', $_);
+					push(@{$inserts{$tabela}}, \%entry);
 				} else {
 					my $delimiter = '(\d{4,}),';
 					if ($tabela eq 'CLIENT_PLAN_CHANGE_AUDIT') {
@@ -153,7 +155,19 @@ foreach(@{$inserts{'CONTRACT_CLIENT'}}) {
 	print($value . "\n");
 }
 foreach(@{$inserts{'PLAN_CLIENT'}}) {
-	assemble_query($_, 'cliente');
+	my $id = ${$_}{'id'};
+    my $idt_old = ${$_}{'cliente'};
+    my $idt_new = $ids{$idt_old};
+	if (!$idt_new) {
+		$idt_new = $idt_old;
+	}
+	print("idt_antigo => " . $idt_old . "\n");
+	print("idt_novo => " . $idt_new . "\n");
+	my $value = ${$_}{'query'};
+	$value =~ s/IDT_CLIENT/IDT_PLAN_CLIENT, IDT_CLIENT/;
+	$value =~ s/values \(/values ($id, /;
+	$value =~ s/, $idt_old,/, $idt_new,/;
+	print($value . "\n");
 }
 foreach(@{$inserts{'CLIENT_PLAN_CHANGE_AUDIT'}}) {
 	assemble_query($_, 'cliente');
