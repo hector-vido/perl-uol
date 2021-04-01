@@ -1,10 +1,16 @@
 # Perl PITR
 
+
 ```perl
 #!/usr/bin/perl
 
+use DBI;
 use Data::Dumper;
 use strict;
+
+my $dsn = "DBI:mysql:mysql:database=$ENV{'DB_NAME'};host=$ENV{'DB_HOST'};port=3306";
+my $dbh = DBI->connect($dsn, $ENV{'DB_USER'}, $ENV{'DB_PASSWORD'});
+$dbh->{AutoCommit} = 0;
 
 if (!$ARGV[0]) {
 	print("Usage: perl recovery.pl file.sql\n");
@@ -18,8 +24,8 @@ my %ids = {};
 sub assemble_query {
 	my $hash = $_[0];
 	my $key = $_[1];
-    my $idt_old = ${$hash}{$key};
-    my $idt_new = $ids{$idt_old};
+	my $idt_old = ${$hash}{$key};
+	my $idt_new = $ids{$idt_old};
 	if (!$idt_new) {
 		$idt_new = $idt_old;
 	}
@@ -28,20 +34,23 @@ sub assemble_query {
 	my $value = ${$hash}{'query'};
 	$value =~ s/$idt_old/$idt_new/;
 	print($value . "\n");
+	$dbh->do($value);
 }
 
 sub assemble_query_update {
 	my $hash = $_[0];
-    my $idt_old = ${$hash}{'old_idt'};
-    my $idt_new = $ids{$idt_old};
+	my $idt_old = ${$hash}{'old_idt'};
+	my $idt_new = $idt_old; #$ids{$idt_old};
 	if (!$idt_new) {
 		$idt_new = $idt_old;
+		return;
 	}
 	print("idt_antigo => " . $idt_old . "\n");
 	print("idt_novo => " . $idt_new . "\n");
 	my $value = ${$hash}{'query'};
 	$value =~ s/IDT_CLIENT=$idt_old/IDT_CLIENT=$idt_new/;
 	print($value . "\n");
+	$dbh->do($value);
 }
 
 my $sql = open(my $fh, '<:encoding(UTF-8)', $ARGV[0]) or die $!;
@@ -60,11 +69,13 @@ while(<$fh>) {
 					my %entry = ('id', $id, 'cod', $cod, 'id_new', $new_id, 'query', $_);
 					push(@{$inserts{$tabela}}, \%entry);
 					$ids{$id} = $new_id;
-					#} elsif ($tabela eq 'CONTRACT_CLIENT') {
-					#	my ($cod) = $_ =~ /(\d{6,})/;
-					#	print($cod . "\n");
-					#	print($_ . "\n");
-					#	print($id); exit;
+				} elsif ($tabela eq 'PLAN_CLIENT') {
+					if(!$inserts{$tabela}) {
+						$inserts{$tabela} = ();
+					}
+					my ($old_idt) = $_ =~ /(\d{6,})/;
+					my %entry = ('id', $id, 'cliente', $old_idt, 'query', $_);
+					push(@{$inserts{$tabela}}, \%entry);
 				} else {
 					my $delimiter = '(\d{4,}),';
 					if ($tabela eq 'CLIENT_PLAN_CHANGE_AUDIT') {
@@ -135,6 +146,7 @@ foreach(@{$inserts{'CLIENT'}}) {
 	$value =~ s/values \(/values ($idt_new, /;
 	$value =~ s/$idt_old/$idt_new/;
 	print($value . "\n");
+	$dbh->do($value);
 }
 foreach(@{$inserts{'CLIENT_DETAIL'}}) {
 	assemble_query($_, 'id')
@@ -142,8 +154,8 @@ foreach(@{$inserts{'CLIENT_DETAIL'}}) {
 foreach(@{$inserts{'CONTRACT_CLIENT'}}) {
 	#assemble_query($_, 'cliente');
 	my $id = ${$_}{'id'};
-    my $idt_old = ${$_}{'cliente'};
-    my $idt_new = $ids{$idt_old};
+	my $idt_old = ${$_}{'cliente'};
+	my $idt_new = $ids{$idt_old};
 	if (!$idt_new) {
 		$idt_new = $idt_old;
 	}
@@ -154,9 +166,23 @@ foreach(@{$inserts{'CONTRACT_CLIENT'}}) {
 	$value =~ s/values \(/values ($id, /;
 	$value =~ s/, $idt_old,/, $idt_new,/;
 	print($value . "\n");
+	$dbh->do($value);
 }
 foreach(@{$inserts{'PLAN_CLIENT'}}) {
-	assemble_query($_, 'cliente');
+	my $id = ${$_}{'id'};
+	my $idt_old = ${$_}{'cliente'};
+	my $idt_new = $ids{$idt_old};
+	if (!$idt_new) {
+		$idt_new = $idt_old;
+	}
+	print("idt_antigo => " . $idt_old . "\n");
+	print("idt_novo => " . $idt_new . "\n");
+	my $value = ${$_}{'query'};
+	$value =~ s/IDT_CLIENT/IDT_PLAN_CLIENT, IDT_CLIENT/;
+	$value =~ s/values \(/values ($id, /;
+	$value =~ s/, $idt_old,/, $idt_new,/;
+	print($value . "\n");
+	$dbh->do($value);
 }
 foreach(@{$inserts{'CLIENT_PLAN_CHANGE_AUDIT'}}) {
 	assemble_query($_, 'cliente');
@@ -183,6 +209,10 @@ foreach(%updates) {
 # CLIENT
 # ESCROW
 # CONTRACT_CLIENT
+
+print "Continuar?";
+<STDIN>;
+$dbh->commit();
 
 close($fh);
 ```
